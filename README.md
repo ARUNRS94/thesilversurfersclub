@@ -106,3 +106,18 @@ Report endpoints support CSV downloads for members, memberships, events, and tra
 ## API Modules
 
 Swagger documentation is generated automatically by FastAPI at `/api/docs`. The API is organized with tags for Authentication, Dashboard, Members, Memberships, Events, Travel, Payments, Documents, Community, Notifications, and Reports.
+
+## Frontend Pages
+
+The React application now provides usable pages for every MVP module:
+
+- Dashboard with KPI cards, charts, and quick-action navigation.
+- Members with a full create form covering contact, address, emergency, and health fields.
+- Memberships with membership type/status tracking and renewal-ready data.
+- Events with event creation, member registration, and manual check-in controls.
+- Travel with trip creation and traveler registration controls.
+- Community with announcement and interest-group creation.
+- Notifications with email/SMS/WhatsApp-ready message queue forms.
+- Documents with browser-based uploads for supported member document types.
+- Payments with receipt-backed payment entry.
+- Reports with CSV download cards.
