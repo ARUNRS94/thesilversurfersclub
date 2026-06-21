@@ -1,0 +1,92 @@
+# SeniorConnect
+
+SeniorConnect is a production-ready starter platform for managing senior citizen communities, memberships, events, travel programs, engagement, documents, payments, and analytics.
+
+## Stack
+
+- Backend: FastAPI, SQLAlchemy, Alembic, SQLite (PostgreSQL-ready)
+- Frontend: React, Material UI, React Query, React Router
+- Auth: JWT authentication with role-based access control
+- Deployment: Docker Compose with Nginx reverse proxy
+
+## Quick Start
+
+```bash
+cp backend/.env.example backend/.env
+docker compose up --build
+```
+
+- Frontend: http://localhost
+- API: http://localhost/api
+- Swagger: http://localhost/api/docs
+
+Default seeded administrator:
+
+- Email: `admin@seniorconnect.local`
+- Password: `Admin123!`
+
+## Local Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+python -m app.seed
+uvicorn app.main:app --reload
+```
+
+## Local Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Architecture
+
+The backend follows a clean layered structure:
+
+- `api/`: HTTP routes and dependency boundaries
+- `core/`: settings, security, RBAC
+- `models/`: SQLAlchemy persistence models
+- `schemas/`: Pydantic DTOs
+- `repositories/`: database access abstractions
+- `services/`: business workflows
+
+The data model is multi-tenant ready through `organization_id` fields on operational records. The MVP seeds a single organization.
+
+## ER Diagram
+
+```mermaid
+erDiagram
+  Organization ||--o{ User : owns
+  Organization ||--o{ Member : manages
+  Member ||--o{ Membership : has
+  Member ||--o{ Document : uploads
+  Member ||--o{ Payment : pays
+  Event ||--o{ EventRegistration : receives
+  Member ||--o{ EventRegistration : makes
+  EventRegistration ||--o| Attendance : tracks
+  Trip ||--o{ TripRegistration : receives
+  Member ||--o{ TripRegistration : books
+  NotificationTemplate ||--o{ Notification : renders
+  Member ||--o{ Notification : receives
+  InterestGroup ||--o{ GroupMembership : includes
+  Member ||--o{ GroupMembership : joins
+  InterestGroup ||--o{ GroupPost : publishes
+```
+
+## Security
+
+- Passwords are hashed with bcrypt.
+- JWT bearer tokens protect private APIs.
+- RBAC dependencies restrict privileged modules.
+- Upload metadata includes MIME type, size, versions, and expiry dates.
+- Audit logs capture actor, action, entity, and timestamp.
+
+## Reports
+
+Report endpoints support CSV downloads for members, memberships, events, and travel. PDF and Excel generation can be added behind the same service interface.
