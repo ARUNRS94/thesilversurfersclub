@@ -90,3 +90,19 @@ erDiagram
 ## Reports
 
 Report endpoints support CSV downloads for members, memberships, events, and travel. PDF and Excel generation can be added behind the same service interface.
+
+## Implemented MVP Workflows
+
+- Sign in with the seeded administrator and use protected navigation across all modules.
+- Create, search, update, and delete members through REST APIs; create members from the frontend.
+- Manage membership records and renewals with status tracking.
+- Create events, register members, and record attendance check-ins.
+- Create trips and register members with capacity-aware waitlisting.
+- Record membership, event, and travel payments with generated receipt numbers.
+- Upload and list document metadata with file type and size enforcement.
+- Publish announcements, manage interest groups, and queue notifications.
+- Download CSV reports for members, events, payments, and trips.
+
+## API Modules
+
+Swagger documentation is generated automatically by FastAPI at `/api/docs`. The API is organized with tags for Authentication, Dashboard, Members, Memberships, Events, Travel, Payments, Documents, Community, Notifications, and Reports.
