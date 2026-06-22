@@ -27,6 +27,14 @@ def apply_update(entity, payload):
         setattr(entity, key, value)
     return entity
 
+def calculate_membership_expiry(db: Session, membership_type: str, join_date: date, supplied_expiry: date | None = None) -> date | None:
+    if supplied_expiry:
+        return supplied_expiry
+    master = db.query(MembershipType).filter(func.lower(MembershipType.name) == membership_type.lower()).first()
+    if not master:
+        raise HTTPException(status_code=400, detail="Membership type is required and must exist in Membership Type Master")
+    return join_date + timedelta(days=master.duration_days)
+
 @router.post("/auth/login", response_model=Token, tags=["Authentication"])
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
@@ -79,7 +87,9 @@ def create_member(payload: MemberCreate, db: Session = Depends(get_db), user: Us
     next_id = db.query(Member).count() + 1
     member = Member(organization_id=user.organization_id, member_id=f"SC-{next_id:05d}", **payload.model_dump())
     db.add(member); db.flush()
-    db.add(Membership(member_id=member.id, membership_number=f"MEM-{next_id:05d}", membership_type="Annual", join_date=date.today(), status=MembershipStatus.ACTIVE))
+    join_date = date.today()
+    expiry_date = calculate_membership_expiry(db, "Annual", join_date)
+    db.add(Membership(member_id=member.id, membership_number=f"MEM-{next_id:05d}", membership_type="Annual", join_date=join_date, expiry_date=expiry_date, status=MembershipStatus.ACTIVE))
     db.commit(); db.refresh(member)
     return member
 
@@ -130,9 +140,7 @@ def list_memberships(db: Session = Depends(get_db), user: User = Depends(get_cur
 def create_membership(payload: MembershipCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
     number = f"MEM-{db.query(Membership).count()+1:05d}"
     data = payload.model_dump(); data["status"] = MembershipStatus(data["status"])
-    master = db.query(MembershipType).filter(func.lower(MembershipType.name) == data["membership_type"].lower()).first()
-    if master and data.get("join_date") and not data.get("expiry_date"):
-        data["expiry_date"] = data["join_date"] + timedelta(days=master.duration_days)
+    data["expiry_date"] = calculate_membership_expiry(db, data["membership_type"], data["join_date"], data.get("expiry_date"))
     membership = Membership(membership_number=number, **data)
     db.add(membership); db.commit(); db.refresh(membership)
     return membership
@@ -142,9 +150,7 @@ def update_membership(membership_id: int, payload: MembershipCreate, db: Session
     membership = db.get(Membership, membership_id)
     if not membership: raise HTTPException(404, "Membership not found")
     data = payload.model_dump(); data["status"] = MembershipStatus(data["status"])
-    master = db.query(MembershipType).filter(func.lower(MembershipType.name) == data["membership_type"].lower()).first()
-    if master and data.get("join_date") and not data.get("expiry_date"):
-        data["expiry_date"] = data["join_date"] + timedelta(days=master.duration_days)
+    data["expiry_date"] = calculate_membership_expiry(db, data["membership_type"], data["join_date"], data.get("expiry_date"))
     for key, value in data.items(): setattr(membership, key, value)
     db.commit(); db.refresh(membership)
     return membership
@@ -185,6 +191,8 @@ def list_event_registrations(event_id: int, db: Session = Depends(get_db), user:
         rows.append({
             "id": reg.id,
             "event_id": reg.event_id,
+            "event_name": event.name,
+            "event_date": event.event_date,
             "member_id": reg.member_id,
             "member_name": f"{member.first_name} {member.last_name}" if member else str(reg.member_id),
             "member_code": member.member_id if member else "",
