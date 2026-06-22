@@ -1,18 +1,23 @@
 import csv
 import io
-from datetime import date
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, require_roles
 from app.core.security import create_access_token, verify_password
 from app.db import get_db
-from app.models import Announcement, Attendance, Document, Event, EventRegistration, InterestGroup, Member, Membership, MembershipStatus, Notification, Payment, RegistrationStatus, Role, Trip, TripRegistration, User
-from app.schemas.common import AnnouncementCreate, DashboardKpis, EventCreate, InterestGroupCreate, LoginRequest, MemberCreate, MemberRead, MembershipCreate, NotificationCreate, PaymentCreate, Token, TripCreate
+from app.models import Announcement, Attendance, Document, Event, EventRegistration, InterestGroup, Member, Membership, MembershipType, MembershipStatus, Notification, Payment, RegistrationStatus, Role, Trip, TripRegistration, User
+from app.schemas.common import AnnouncementCreate, DashboardKpis, EventCreate, InterestGroupCreate, LoginRequest, MemberCreate, MemberRead, MembershipCreate, MembershipTypeCreate, NotificationCreate, PaymentCreate, Token, TripCreate
 from app.services.dashboard import get_dashboard
 
 router = APIRouter()
 MANAGERS = (Role.COMMUNITY_MANAGER, Role.FINANCE_MANAGER)
+
+def apply_update(entity, payload):
+    for key, value in payload.model_dump().items():
+        setattr(entity, key, value)
+    return entity
 
 @router.post("/auth/login", response_model=Token, tags=["Authentication"])
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -53,7 +58,7 @@ def get_member(member_id: int, db: Session = Depends(get_db), user: User = Depen
 def update_member(member_id: int, payload: MemberCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
     member = db.get(Member, member_id)
     if not member: raise HTTPException(404, "Member not found")
-    for key, value in payload.model_dump().items(): setattr(member, key, value)
+    apply_update(member, payload)
     db.commit(); db.refresh(member)
     return member
 
@@ -64,6 +69,24 @@ def delete_member(member_id: int, db: Session = Depends(get_db), user: User = De
     db.delete(member); db.commit()
     return {"ok": True}
 
+@router.get("/membership-types", tags=["Membership Types"])
+def list_membership_types(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return db.query(MembershipType).order_by(MembershipType.name).all()
+
+@router.post("/membership-types", tags=["Membership Types"])
+def create_membership_type(payload: MembershipTypeCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
+    membership_type = MembershipType(**payload.model_dump())
+    db.add(membership_type); db.commit(); db.refresh(membership_type)
+    return membership_type
+
+@router.put("/membership-types/{membership_type_id}", tags=["Membership Types"])
+def update_membership_type(membership_type_id: int, payload: MembershipTypeCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
+    membership_type = db.get(MembershipType, membership_type_id)
+    if not membership_type: raise HTTPException(404, "Membership type not found")
+    apply_update(membership_type, payload)
+    db.commit(); db.refresh(membership_type)
+    return membership_type
+
 @router.get("/memberships", tags=["Memberships"])
 def list_memberships(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return db.query(Membership).order_by(Membership.expiry_date).all()
@@ -71,8 +94,24 @@ def list_memberships(db: Session = Depends(get_db), user: User = Depends(get_cur
 @router.post("/memberships", tags=["Memberships"])
 def create_membership(payload: MembershipCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
     number = f"MEM-{db.query(Membership).count()+1:05d}"
-    data = payload.model_dump(); data["status"] = MembershipStatus(data["status"]); membership = Membership(membership_number=number, **data)
+    data = payload.model_dump(); data["status"] = MembershipStatus(data["status"])
+    master = db.query(MembershipType).filter(func.lower(MembershipType.name) == data["membership_type"].lower()).first()
+    if master and data.get("join_date") and not data.get("expiry_date"):
+        data["expiry_date"] = data["join_date"] + timedelta(days=master.duration_days)
+    membership = Membership(membership_number=number, **data)
     db.add(membership); db.commit(); db.refresh(membership)
+    return membership
+
+@router.put("/memberships/{membership_id}", tags=["Memberships"])
+def update_membership(membership_id: int, payload: MembershipCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
+    membership = db.get(Membership, membership_id)
+    if not membership: raise HTTPException(404, "Membership not found")
+    data = payload.model_dump(); data["status"] = MembershipStatus(data["status"])
+    master = db.query(MembershipType).filter(func.lower(MembershipType.name) == data["membership_type"].lower()).first()
+    if master and data.get("join_date") and not data.get("expiry_date"):
+        data["expiry_date"] = data["join_date"] + timedelta(days=master.duration_days)
+    for key, value in data.items(): setattr(membership, key, value)
+    db.commit(); db.refresh(membership)
     return membership
 
 @router.put("/memberships/{membership_id}/renew", tags=["Memberships"])
@@ -91,6 +130,14 @@ def list_events(db: Session = Depends(get_db), user: User = Depends(get_current_
 def create_event(payload: EventCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.COMMUNITY_MANAGER, Role.EVENT_COORDINATOR))):
     event = Event(organization_id=user.organization_id, **payload.model_dump())
     db.add(event); db.commit(); db.refresh(event)
+    return event
+
+@router.put("/events/{event_id}", tags=["Events"])
+def update_event(event_id: int, payload: EventCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.COMMUNITY_MANAGER, Role.EVENT_COORDINATOR))):
+    event = db.get(Event, event_id)
+    if not event: raise HTTPException(404, "Event not found")
+    apply_update(event, payload)
+    db.commit(); db.refresh(event)
     return event
 
 @router.post("/events/{event_id}/register/{member_id}", tags=["Events"])
@@ -119,6 +166,14 @@ def create_trip(payload: TripCreate, db: Session = Depends(get_db), user: User =
     db.add(trip); db.commit(); db.refresh(trip)
     return trip
 
+@router.put("/trips/{trip_id}", tags=["Travel"])
+def update_trip(trip_id: int, payload: TripCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.COMMUNITY_MANAGER))):
+    trip = db.get(Trip, trip_id)
+    if not trip: raise HTTPException(404, "Trip not found")
+    apply_update(trip, payload)
+    db.commit(); db.refresh(trip)
+    return trip
+
 @router.post("/trips/{trip_id}/register/{member_id}", tags=["Travel"])
 def register_trip(trip_id: int, member_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     trip = db.get(Trip, trip_id)
@@ -136,6 +191,14 @@ def list_payments(db: Session = Depends(get_db), user: User = Depends(require_ro
 def create_payment(payload: PaymentCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
     payment = Payment(receipt_number=f"RCT-{db.query(Payment).count()+1:06d}", **payload.model_dump())
     db.add(payment); db.commit(); db.refresh(payment)
+    return payment
+
+@router.put("/payments/{payment_id}", tags=["Payments"])
+def update_payment(payment_id: int, payload: PaymentCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
+    payment = db.get(Payment, payment_id)
+    if not payment: raise HTTPException(404, "Payment not found")
+    apply_update(payment, payload)
+    db.commit(); db.refresh(payment)
     return payment
 
 @router.get("/documents", tags=["Documents"])
@@ -162,6 +225,14 @@ def create_announcement(payload: AnnouncementCreate, db: Session = Depends(get_d
     db.add(announcement); db.commit(); db.refresh(announcement)
     return announcement
 
+@router.put("/announcements/{announcement_id}", tags=["Community"])
+def update_announcement(announcement_id: int, payload: AnnouncementCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.COMMUNITY_MANAGER))):
+    announcement = db.get(Announcement, announcement_id)
+    if not announcement: raise HTTPException(404, "Announcement not found")
+    apply_update(announcement, payload)
+    db.commit(); db.refresh(announcement)
+    return announcement
+
 @router.get("/groups", tags=["Community"])
 def list_groups(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return db.query(InterestGroup).order_by(InterestGroup.name).all()
@@ -172,6 +243,14 @@ def create_group(payload: InterestGroupCreate, db: Session = Depends(get_db), us
     db.add(group); db.commit(); db.refresh(group)
     return group
 
+@router.put("/groups/{group_id}", tags=["Community"])
+def update_group(group_id: int, payload: InterestGroupCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.COMMUNITY_MANAGER))):
+    group = db.get(InterestGroup, group_id)
+    if not group: raise HTTPException(404, "Group not found")
+    apply_update(group, payload)
+    db.commit(); db.refresh(group)
+    return group
+
 @router.get("/notifications", tags=["Notifications"])
 def list_notifications(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return db.query(Notification).order_by(Notification.created_at.desc()).all()
@@ -180,6 +259,15 @@ def list_notifications(db: Session = Depends(get_db), user: User = Depends(get_c
 def create_notification(payload: NotificationCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.COMMUNITY_MANAGER))):
     note = Notification(**payload.model_dump())
     db.add(note); db.commit(); db.refresh(note)
+    return note
+
+
+@router.put("/notifications/{notification_id}", tags=["Notifications"])
+def update_notification(notification_id: int, payload: NotificationCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.COMMUNITY_MANAGER))):
+    note = db.get(Notification, notification_id)
+    if not note: raise HTTPException(404, "Notification not found")
+    apply_update(note, payload)
+    db.commit(); db.refresh(note)
     return note
 
 @router.get("/reports/{report_name}.csv", tags=["Reports"])
