@@ -9,6 +9,27 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class CurrentUserRead(BaseModel):
+    email: str
+    role: str
+    is_active: bool
+    allowed_pages: list[str] = []
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str | None = None
+    role: str
+    is_active: bool = True
+    allowed_pages: list[str] = []
+
+class AdminUserRead(BaseModel):
+    id: int
+    email: EmailStr
+    role: str
+    is_active: bool
+    allowed_pages: list[str] = []
+    model_config = {"from_attributes": True}
+
 class MemberCreate(BaseModel):
     first_name: str
     last_name: str
@@ -24,6 +45,11 @@ class MemberCreate(BaseModel):
     state: str | None = None
     country: str | None = None
     postal_code: str | None = None
+    aadhaar_number: str | None = None
+    passport_number: str | None = None
+    passport_expiry_date: date | None = None
+    pan_number: str | None = None
+    rtc_details: str | None = None
     emergency_contact_name: str | None = None
     emergency_relationship: str | None = None
     emergency_phone: str | None = None
@@ -36,6 +62,13 @@ class MemberRead(MemberCreate):
     id: int
     member_id: str
     model_config = {"from_attributes": True}
+
+class MembershipTypeCreate(BaseModel):
+    name: str
+    duration_days: int
+    fee: float = 0
+    description: str | None = None
+    is_active: bool = True
 
 class MembershipCreate(BaseModel):
     member_id: int
