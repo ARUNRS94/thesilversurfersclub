@@ -42,6 +42,7 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.MEMBER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    allowed_pages: Mapped[str | None] = mapped_column(Text)
     organization = relationship("Organization", back_populates="users")
 
 class Member(Base, TimestampMixin):
@@ -81,6 +82,15 @@ class Member(Base, TimestampMixin):
     organization = relationship("Organization", back_populates="members")
     memberships = relationship("Membership", back_populates="member", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="member")
+
+class MembershipType(Base, TimestampMixin):
+    __tablename__ = "membership_types"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    duration_days: Mapped[int] = mapped_column(Integer)
+    fee: Mapped[float] = mapped_column(Float, default=0)
+    description: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 class Membership(Base, TimestampMixin):
     __tablename__ = "memberships"
