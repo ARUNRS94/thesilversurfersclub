@@ -34,13 +34,13 @@ For a club computer that needs an offline/on-premise setup, build a Windows pack
 powershell -ExecutionPolicy Bypass -File installer\windows\build_installer.ps1
 ```
 
-The build creates `dist\SeniorConnect-Windows`. Copy that folder to the Windows PC and double-click `Start-SeniorConnect.bat`; it starts `SeniorConnectServer.exe`, opens the browser, and stores SQLite data/uploads next to the executable for easy backup.
+The build creates `dist\SeniorConnect-Windows`. Copy that folder to the Windows PC and double-click `Start-SeniorConnect.bat`; it runs `SeniorConnectServer.exe` in a visible server window, opens the browser, writes startup failures to `seniorconnect-error.log`, and stores SQLite data/uploads next to the executable for easy backup.
 
 The backend executable is created from `backend/start_server.py` using PyInstaller, equivalent to:
 
 ```bash
 pip install pyinstaller
-pyinstaller --onefile backend/start_server.py
+pyinstaller --onefile --paths backend --collect-submodules app backend/start_server.py
 ```
 
 ## Local Backend

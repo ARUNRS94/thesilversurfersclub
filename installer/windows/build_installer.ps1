@@ -20,7 +20,7 @@ npm install
 npm run build
 Pop-Location
 
-python -m PyInstaller --clean --onefile --name SeniorConnectServer --paths backend backend\start_server.py
+python -m PyInstaller --clean --onefile --name SeniorConnectServer --paths backend --collect-submodules app --hidden-import app.main --hidden-import app.seed backend\start_server.py
 
 $Package = Join-Path $Root $OutputDir
 Remove-Item $Package -Recurse -Force -ErrorAction SilentlyContinue

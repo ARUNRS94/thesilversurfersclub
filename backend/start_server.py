@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import sys
+import traceback
 import webbrowser
 from pathlib import Path
 
@@ -19,6 +20,13 @@ def app_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parents[1]
+
+
+def write_startup_error(root: Path, exc: BaseException) -> Path:
+    """Persist startup errors so double-click users can send diagnostics."""
+    log_path = root / "seniorconnect-error.log"
+    log_path.write_text("SeniorConnect failed to start:\n\n" + "".join(traceback.format_exception(exc)), encoding="utf-8")
+    return log_path
 
 
 def configure_environment(root: Path) -> None:
@@ -44,11 +52,28 @@ def create_app():
     frontend_dist = root / "frontend" / "dist"
     if frontend_dist.exists():
         app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+    else:
+        print(f"Warning: frontend bundle not found at {frontend_dist}")
     return app
 
 
+def main() -> None:
+    root = app_root()
+    try:
+        port = int(os.environ.get("PORT", "8000"))
+        app = create_app()
+        url = f"http://127.0.0.1:{port}"
+        print(f"SeniorConnect is running at {url}")
+        print("Keep this window open while using the software.")
+        if os.environ.get("SENIORCONNECT_OPEN_BROWSER", "1") == "1":
+            webbrowser.open(url)
+        uvicorn.run(app, host="127.0.0.1", port=port)
+    except Exception as exc:  # noqa: BLE001 - top-level executable diagnostics
+        log_path = write_startup_error(root, exc)
+        print(f"SeniorConnect failed to start. Details were saved to: {log_path}")
+        traceback.print_exception(exc)
+        raise
+
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8000"))
-    if os.environ.get("SENIORCONNECT_OPEN_BROWSER", "1") == "1":
-        webbrowser.open(f"http://127.0.0.1:{port}")
-    uvicorn.run(create_app(), host="127.0.0.1", port=port)
+    main()
