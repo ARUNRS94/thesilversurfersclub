@@ -175,10 +175,33 @@ def update_event(event_id: int, payload: EventCreate, db: Session = Depends(get_
     db.commit(); db.refresh(event)
     return event
 
+@router.get("/events/{event_id}/registrations", tags=["Events"])
+def list_event_registrations(event_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    event = db.get(Event, event_id)
+    if not event: raise HTTPException(404, "Event not found")
+    rows = []
+    for reg in db.query(EventRegistration).filter_by(event_id=event_id).order_by(EventRegistration.created_at.desc()).all():
+        member = db.get(Member, reg.member_id)
+        rows.append({
+            "id": reg.id,
+            "event_id": reg.event_id,
+            "member_id": reg.member_id,
+            "member_name": f"{member.first_name} {member.last_name}" if member else str(reg.member_id),
+            "member_code": member.member_id if member else "",
+            "status": reg.status.value,
+            "created_at": reg.created_at,
+        })
+    return rows
+
 @router.post("/events/{event_id}/register/{member_id}", tags=["Events"])
 def register_event(event_id: int, member_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     event = db.get(Event, event_id)
     if not event: raise HTTPException(404, "Event not found")
+    member = db.get(Member, member_id)
+    if not member: raise HTTPException(404, "Member not found")
+    existing = db.query(EventRegistration).filter_by(event_id=event_id, member_id=member_id).first()
+    if existing:
+        return existing
     registered = db.query(EventRegistration).filter_by(event_id=event_id).count()
     status = RegistrationStatus.WAITLISTED if registered >= event.capacity else RegistrationStatus.REGISTERED
     reg = EventRegistration(event_id=event_id, member_id=member_id, status=status)
