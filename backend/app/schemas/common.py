@@ -24,6 +24,11 @@ class MemberCreate(BaseModel):
     state: str | None = None
     country: str | None = None
     postal_code: str | None = None
+    aadhaar_number: str | None = None
+    passport_number: str | None = None
+    passport_expiry_date: date | None = None
+    pan_number: str | None = None
+    rtc_details: str | None = None
     emergency_contact_name: str | None = None
     emergency_relationship: str | None = None
     emergency_phone: str | None = None
