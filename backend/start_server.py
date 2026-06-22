@@ -14,6 +14,11 @@ from pathlib import Path
 import uvicorn
 from fastapi.staticfiles import StaticFiles
 
+# PyInstaller does not always detect passlib bcrypt handlers because passlib
+# loads them dynamically from its registry at runtime. Keep this import so the
+# one-file Windows executable includes the handler required by app.core.security.
+import passlib.handlers.bcrypt  # noqa: F401
+
 
 def app_root() -> Path:
     """Return the application root for source or PyInstaller execution."""

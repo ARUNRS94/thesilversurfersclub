@@ -40,7 +40,7 @@ The backend executable is created from `backend/start_server.py` using PyInstall
 
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --paths backend --collect-submodules app backend/start_server.py
+pyinstaller --onefile --paths backend --collect-submodules app --collect-submodules passlib.handlers --collect-submodules passlib.crypto --hidden-import passlib.handlers.bcrypt --hidden-import bcrypt backend/start_server.py
 ```
 
 ## Local Backend
