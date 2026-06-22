@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from app.core.security import hash_password, verify_password
 from app.db import Base, SessionLocal, engine
-from app.models import Event, InterestGroup, Member, Membership, MembershipStatus, NotificationTemplate, Organization, Role, Trip, User
+from app.models import Event, InterestGroup, Member, Membership, MembershipStatus, MembershipType, NotificationTemplate, Organization, Role, Trip, User
 
 Base.metadata.create_all(bind=engine)
 db = SessionLocal()
@@ -19,6 +19,10 @@ else:
     admin.is_active = True
 if admin and not verify_password(DEFAULT_ADMIN_PASSWORD, admin.hashed_password):
     admin.hashed_password = hash_password(DEFAULT_ADMIN_PASSWORD)
+for name, days, fee in [("Annual", 365, 5000), ("Lifetime", 36500, 50000), ("Family", 365, 8000), ("Premium", 365, 12000)]:
+    if not db.query(MembershipType).filter_by(name=name).first():
+        db.add(MembershipType(name=name, duration_days=days, fee=fee, description=f"{name} membership"))
+
 if not db.query(Member).first():
     member = Member(organization_id=org.id, member_id="SC-00001", first_name="Anita", last_name="Rao", mobile_number="+91-90000-00001", email="anita@example.com", date_of_birth=date(1952, 6, 10), city="Bengaluru")
     db.add(member); db.flush()
