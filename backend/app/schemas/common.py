@@ -1,5 +1,13 @@
 from datetime import date
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+class StrictBaseModel(BaseModel):
+    @field_validator('*', mode='before')
+    @classmethod
+    def reject_blank_mandatory_strings(cls, value):
+        if isinstance(value, str) and value.strip() == '':
+            return None
+        return value
 
 class Token(BaseModel):
     access_token: str
@@ -15,7 +23,7 @@ class CurrentUserRead(BaseModel):
     is_active: bool
     allowed_pages: list[str] = []
 
-class AdminUserCreate(BaseModel):
+class AdminUserCreate(StrictBaseModel):
     email: EmailStr
     password: str | None = None
     role: str
@@ -30,10 +38,10 @@ class AdminUserRead(BaseModel):
     allowed_pages: list[str] = []
     model_config = {"from_attributes": True}
 
-class MemberCreate(BaseModel):
-    first_name: str
-    last_name: str
-    mobile_number: str
+class MemberCreate(StrictBaseModel):
+    first_name: str = Field(min_length=1)
+    last_name: str = Field(min_length=1)
+    mobile_number: str = Field(min_length=1)
     email: EmailStr | None = None
     date_of_birth: date | None = None
     gender: str | None = None
@@ -63,62 +71,62 @@ class MemberRead(MemberCreate):
     member_id: str
     model_config = {"from_attributes": True}
 
-class MembershipTypeCreate(BaseModel):
-    name: str
-    duration_days: int
+class MembershipTypeCreate(StrictBaseModel):
+    name: str = Field(min_length=1)
+    duration_days: int = Field(gt=0)
     fee: float = 0
     description: str | None = None
     is_active: bool = True
 
-class MembershipCreate(BaseModel):
-    member_id: int
-    membership_type: str = "Annual"
+class MembershipCreate(StrictBaseModel):
+    member_id: int = Field(gt=0)
+    membership_type: str = Field(default="Annual", min_length=1)
     join_date: date
     expiry_date: date | None = None
     status: str = "active"
 
-class EventCreate(BaseModel):
-    name: str
-    venue: str
+class EventCreate(StrictBaseModel):
+    name: str = Field(min_length=1)
+    venue: str = Field(min_length=1)
     event_date: date
-    capacity: int
+    capacity: int = Field(gt=0)
     description: str | None = None
     start_time: str | None = None
     end_time: str | None = None
     registration_deadline: date | None = None
 
-class TripCreate(BaseModel):
-    name: str
-    destination: str
+class TripCreate(StrictBaseModel):
+    name: str = Field(min_length=1)
+    destination: str = Field(min_length=1)
     start_date: date
     end_date: date
-    capacity: int
+    capacity: int = Field(gt=0)
     cost: float = 0
     organizer: str | None = None
     description: str | None = None
 
-class PaymentCreate(BaseModel):
-    member_id: int
-    payment_for: str
-    amount: float
+class PaymentCreate(StrictBaseModel):
+    member_id: int = Field(gt=0)
+    payment_for: str = Field(min_length=1)
+    amount: float = Field(gt=0)
     payment_date: date
-    payment_method: str
+    payment_method: str = Field(min_length=1)
     status: str = "paid"
 
-class AnnouncementCreate(BaseModel):
-    title: str
-    body: str
+class AnnouncementCreate(StrictBaseModel):
+    title: str = Field(min_length=1)
+    body: str = Field(min_length=1)
     category: str = "news"
 
-class InterestGroupCreate(BaseModel):
-    name: str
+class InterestGroupCreate(StrictBaseModel):
+    name: str = Field(min_length=1)
     description: str | None = None
 
-class NotificationCreate(BaseModel):
+class NotificationCreate(StrictBaseModel):
     member_id: int | None = None
-    type: str
-    subject: str
-    body: str
+    type: str = Field(min_length=1)
+    subject: str = Field(min_length=1)
+    body: str = Field(min_length=1)
     channel: str = "email"
 
 class DashboardKpis(BaseModel):

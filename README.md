@@ -25,6 +25,17 @@ Default seeded administrator:
 - Email: `admin@seniorconnect.local`
 - Password: `Admin123!`
 
+
+### One-click / layman-friendly install
+
+For a non-technical user, install Docker Desktop once, then run the installer script from this folder:
+
+```bash
+./scripts/install.sh
+```
+
+The script creates `backend/.env` when missing, builds and starts the app in the background, and prints the browser URL plus default login. This can be wrapped later in a Windows `.bat` or macOS double-click launcher for a true one-click desktop handoff.
+
 ## Local Backend
 
 ```bash
