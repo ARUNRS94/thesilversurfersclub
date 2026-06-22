@@ -1,14 +1,14 @@
 import csv
 import io
-from datetime import date
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, require_roles
 from app.core.security import create_access_token, verify_password
 from app.db import get_db
-from app.models import Announcement, Attendance, Document, Event, EventRegistration, InterestGroup, Member, Membership, MembershipStatus, Notification, Payment, RegistrationStatus, Role, Trip, TripRegistration, User
-from app.schemas.common import AnnouncementCreate, DashboardKpis, EventCreate, InterestGroupCreate, LoginRequest, MemberCreate, MemberRead, MembershipCreate, NotificationCreate, PaymentCreate, Token, TripCreate
+from app.models import Announcement, Attendance, Document, Event, EventRegistration, InterestGroup, Member, Membership, MembershipType, MembershipStatus, Notification, Payment, RegistrationStatus, Role, Trip, TripRegistration, User
+from app.schemas.common import AnnouncementCreate, DashboardKpis, EventCreate, InterestGroupCreate, LoginRequest, MemberCreate, MemberRead, MembershipCreate, MembershipTypeCreate, NotificationCreate, PaymentCreate, Token, TripCreate
 from app.services.dashboard import get_dashboard
 
 router = APIRouter()
@@ -69,6 +69,24 @@ def delete_member(member_id: int, db: Session = Depends(get_db), user: User = De
     db.delete(member); db.commit()
     return {"ok": True}
 
+@router.get("/membership-types", tags=["Membership Types"])
+def list_membership_types(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return db.query(MembershipType).order_by(MembershipType.name).all()
+
+@router.post("/membership-types", tags=["Membership Types"])
+def create_membership_type(payload: MembershipTypeCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
+    membership_type = MembershipType(**payload.model_dump())
+    db.add(membership_type); db.commit(); db.refresh(membership_type)
+    return membership_type
+
+@router.put("/membership-types/{membership_type_id}", tags=["Membership Types"])
+def update_membership_type(membership_type_id: int, payload: MembershipTypeCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
+    membership_type = db.get(MembershipType, membership_type_id)
+    if not membership_type: raise HTTPException(404, "Membership type not found")
+    apply_update(membership_type, payload)
+    db.commit(); db.refresh(membership_type)
+    return membership_type
+
 @router.get("/memberships", tags=["Memberships"])
 def list_memberships(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return db.query(Membership).order_by(Membership.expiry_date).all()
@@ -76,7 +94,11 @@ def list_memberships(db: Session = Depends(get_db), user: User = Depends(get_cur
 @router.post("/memberships", tags=["Memberships"])
 def create_membership(payload: MembershipCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(*MANAGERS))):
     number = f"MEM-{db.query(Membership).count()+1:05d}"
-    data = payload.model_dump(); data["status"] = MembershipStatus(data["status"]); membership = Membership(membership_number=number, **data)
+    data = payload.model_dump(); data["status"] = MembershipStatus(data["status"])
+    master = db.query(MembershipType).filter(func.lower(MembershipType.name) == data["membership_type"].lower()).first()
+    if master and data.get("join_date") and not data.get("expiry_date"):
+        data["expiry_date"] = data["join_date"] + timedelta(days=master.duration_days)
+    membership = Membership(membership_number=number, **data)
     db.add(membership); db.commit(); db.refresh(membership)
     return membership
 
@@ -85,6 +107,9 @@ def update_membership(membership_id: int, payload: MembershipCreate, db: Session
     membership = db.get(Membership, membership_id)
     if not membership: raise HTTPException(404, "Membership not found")
     data = payload.model_dump(); data["status"] = MembershipStatus(data["status"])
+    master = db.query(MembershipType).filter(func.lower(MembershipType.name) == data["membership_type"].lower()).first()
+    if master and data.get("join_date") and not data.get("expiry_date"):
+        data["expiry_date"] = data["join_date"] + timedelta(days=master.duration_days)
     for key, value in data.items(): setattr(membership, key, value)
     db.commit(); db.refresh(membership)
     return membership

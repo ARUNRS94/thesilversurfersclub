@@ -42,6 +42,13 @@ class MemberRead(MemberCreate):
     member_id: str
     model_config = {"from_attributes": True}
 
+class MembershipTypeCreate(BaseModel):
+    name: str
+    duration_days: int
+    fee: float = 0
+    description: str | None = None
+    is_active: bool = True
+
 class MembershipCreate(BaseModel):
     member_id: int
     membership_type: str = "Annual"
