@@ -3,6 +3,7 @@ SeniorConnect one-click Windows package
 
 For the club computer:
 1. Copy this whole SeniorConnect-Windows folder to the Windows PC.
+   Important: keep SeniorConnectServer.exe together with the frontend folder.
 2. Double-click Start-SeniorConnect.bat and keep the black server window open.
 3. The browser opens at http://127.0.0.1:8000.
 4. Login with admin@seniorconnect.local / Admin123! unless you changed the seed.

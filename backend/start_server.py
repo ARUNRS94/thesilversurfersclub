@@ -43,6 +43,22 @@ def configure_environment(root: Path) -> None:
     os.environ.setdefault("UPLOAD_DIR", str(uploads_dir))
 
 
+def find_frontend_dist(root: Path) -> Path | None:
+    """Find the compiled frontend beside the exe or in common build folders."""
+    candidates = [
+        root / "frontend" / "dist",
+        root / "SeniorConnect-Windows" / "frontend" / "dist",
+        root.parent / "frontend" / "dist",
+    ]
+    for candidate in candidates:
+        if (candidate / "index.html").exists():
+            return candidate
+    print("Warning: frontend bundle not found. Checked:")
+    for candidate in candidates:
+        print(f"  - {candidate}")
+    return None
+
+
 def create_app():
     root = app_root()
     configure_environment(root)
@@ -54,11 +70,10 @@ def create_app():
 
     seed_db.close()
 
-    frontend_dist = root / "frontend" / "dist"
-    if frontend_dist.exists():
+    frontend_dist = find_frontend_dist(root)
+    if frontend_dist:
+        print(f"Serving frontend from {frontend_dist}")
         app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
-    else:
-        print(f"Warning: frontend bundle not found at {frontend_dist}")
     return app
 
 
