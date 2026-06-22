@@ -26,15 +26,22 @@ Default seeded administrator:
 - Password: `Admin123!`
 
 
-### One-click / layman-friendly install
+### One-click Windows/offline install
 
-For a non-technical user, install Docker Desktop once, then run the installer script from this folder:
+For a club computer that needs an offline/on-premise setup, build a Windows package that includes a PyInstaller FastAPI executable and the compiled frontend:
 
-```bash
-./scripts/install.sh
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\windows\build_installer.ps1
 ```
 
-The script creates `backend/.env` when missing, builds and starts the app in the background, and prints the browser URL plus default login. This can be wrapped later in a Windows `.bat` or macOS double-click launcher for a true one-click desktop handoff.
+The build creates `dist\SeniorConnect-Windows`. Copy that folder to the Windows PC and double-click `Start-SeniorConnect.bat`; it starts `SeniorConnectServer.exe`, opens the browser, and stores SQLite data/uploads next to the executable for easy backup.
+
+The backend executable is created from `backend/start_server.py` using PyInstaller, equivalent to:
+
+```bash
+pip install pyinstaller
+pyinstaller --onefile backend/start_server.py
+```
 
 ## Local Backend
 
