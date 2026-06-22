@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.db import Base, SessionLocal, engine
 from app.models import Event, InterestGroup, Member, Membership, MembershipStatus, NotificationTemplate, Organization, Role, Trip, User
 
@@ -7,8 +7,18 @@ Base.metadata.create_all(bind=engine)
 db = SessionLocal()
 org = db.query(Organization).first() or Organization(name="The Silver Surfers Club")
 db.add(org); db.flush()
-if not db.query(User).filter_by(email="admin@seniorconnect.local").first():
-    db.add(User(organization_id=org.id, email="admin@seniorconnect.local", hashed_password=hash_password("Admin123!"), role=Role.SUPER_ADMIN))
+
+DEFAULT_ADMIN_EMAIL = "admin@seniorconnect.local"
+DEFAULT_ADMIN_PASSWORD = "Admin123!"
+admin = db.query(User).filter(User.email.ilike(DEFAULT_ADMIN_EMAIL)).first()
+if not admin:
+    db.add(User(organization_id=org.id, email=DEFAULT_ADMIN_EMAIL, hashed_password=hash_password(DEFAULT_ADMIN_PASSWORD), role=Role.SUPER_ADMIN))
+else:
+    admin.email = DEFAULT_ADMIN_EMAIL
+    admin.role = Role.SUPER_ADMIN
+    admin.is_active = True
+if admin and not verify_password(DEFAULT_ADMIN_PASSWORD, admin.hashed_password):
+    admin.hashed_password = hash_password(DEFAULT_ADMIN_PASSWORD)
 if not db.query(Member).first():
     member = Member(organization_id=org.id, member_id="SC-00001", first_name="Anita", last_name="Rao", mobile_number="+91-90000-00001", email="anita@example.com", date_of_birth=date(1952, 6, 10), city="Bengaluru")
     db.add(member); db.flush()

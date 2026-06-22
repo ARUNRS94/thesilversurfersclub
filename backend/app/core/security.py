@@ -9,7 +9,10 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 def verify_password(password: str, hashed: str) -> bool:
-    return pwd_context.verify(password, hashed)
+    try:
+        return pwd_context.verify(password, hashed)
+    except (TypeError, ValueError):
+        return False
 
 def create_access_token(subject: str, role: str) -> str:
     expires = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)

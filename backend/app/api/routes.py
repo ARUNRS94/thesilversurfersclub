@@ -2,6 +2,7 @@ import csv
 import io
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, require_roles
 from app.core.security import create_access_token, verify_password
@@ -15,7 +16,8 @@ MANAGERS = (Role.COMMUNITY_MANAGER, Role.FINANCE_MANAGER)
 
 @router.post("/auth/login", response_model=Token, tags=["Authentication"])
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return Token(access_token=create_access_token(user.email, user.role.value))
