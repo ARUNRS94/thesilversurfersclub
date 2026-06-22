@@ -42,6 +42,7 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.MEMBER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    allowed_pages: Mapped[str | None] = mapped_column(Text)
     organization = relationship("Organization", back_populates="users")
 
 class Member(Base, TimestampMixin):

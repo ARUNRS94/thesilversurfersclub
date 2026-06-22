@@ -5,11 +5,19 @@ from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, Fil
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, require_roles
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, hash_password, verify_password
 from app.db import get_db
 from app.models import Announcement, Attendance, Document, Event, EventRegistration, InterestGroup, Member, Membership, MembershipType, MembershipStatus, Notification, Payment, RegistrationStatus, Role, Trip, TripRegistration, User
-from app.schemas.common import AnnouncementCreate, DashboardKpis, EventCreate, InterestGroupCreate, LoginRequest, MemberCreate, MemberRead, MembershipCreate, MembershipTypeCreate, NotificationCreate, PaymentCreate, Token, TripCreate
+from app.schemas.common import AdminUserCreate, AdminUserRead, AnnouncementCreate, CurrentUserRead, DashboardKpis, EventCreate, InterestGroupCreate, LoginRequest, MemberCreate, MemberRead, MembershipCreate, MembershipTypeCreate, NotificationCreate, PaymentCreate, Token, TripCreate
 from app.services.dashboard import get_dashboard
+
+ALL_PAGES = ["dashboard", "members", "memberships", "membership-types", "events", "trips", "community", "notifications", "payments", "reports", "users"]
+
+def pages_to_string(pages: list[str] | None) -> str:
+    return ",".join([page for page in (pages or []) if page in ALL_PAGES])
+
+def user_to_read(user: User) -> dict:
+    return {"id": user.id, "email": user.email, "role": user.role.value, "is_active": user.is_active, "allowed_pages": list(filter(None, (user.allowed_pages or "").split(",")))}
 
 router = APIRouter()
 MANAGERS = (Role.COMMUNITY_MANAGER, Role.FINANCE_MANAGER)
@@ -26,6 +34,33 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return Token(access_token=create_access_token(user.email, user.role.value))
+
+@router.get("/auth/me", response_model=CurrentUserRead, tags=["Authentication"])
+def me(user: User = Depends(get_current_user)):
+    pages = ALL_PAGES if user.role == Role.SUPER_ADMIN else list(filter(None, (user.allowed_pages or "").split(",")))
+    return {"email": user.email, "role": user.role.value, "is_active": user.is_active, "allowed_pages": pages}
+
+@router.get("/users", response_model=list[AdminUserRead], tags=["Users"])
+def list_users(db: Session = Depends(get_db), user: User = Depends(require_roles(Role.SUPER_ADMIN))):
+    return [user_to_read(item) for item in db.query(User).order_by(User.email).all()]
+
+@router.post("/users", response_model=AdminUserRead, tags=["Users"])
+def create_user(payload: AdminUserCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.SUPER_ADMIN))):
+    role = Role(payload.role)
+    existing = db.query(User).filter(func.lower(User.email) == payload.email.lower()).first()
+    if existing: raise HTTPException(status_code=400, detail="User already exists")
+    new_user = User(organization_id=user.organization_id, email=payload.email.lower(), hashed_password=hash_password(payload.password or "ChangeMe123!"), role=role, is_active=payload.is_active, allowed_pages=pages_to_string(payload.allowed_pages))
+    db.add(new_user); db.commit(); db.refresh(new_user)
+    return user_to_read(new_user)
+
+@router.put("/users/{user_id}", response_model=AdminUserRead, tags=["Users"])
+def update_user(user_id: int, payload: AdminUserCreate, db: Session = Depends(get_db), user: User = Depends(require_roles(Role.SUPER_ADMIN))):
+    target = db.get(User, user_id)
+    if not target: raise HTTPException(404, "User not found")
+    target.email = payload.email.lower(); target.role = Role(payload.role); target.is_active = payload.is_active; target.allowed_pages = pages_to_string(payload.allowed_pages)
+    if payload.password: target.hashed_password = hash_password(payload.password)
+    db.commit(); db.refresh(target)
+    return user_to_read(target)
 
 @router.get("/dashboard", response_model=DashboardKpis, tags=["Dashboard"])
 def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):

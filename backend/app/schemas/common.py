@@ -9,6 +9,27 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class CurrentUserRead(BaseModel):
+    email: str
+    role: str
+    is_active: bool
+    allowed_pages: list[str] = []
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str | None = None
+    role: str
+    is_active: bool = True
+    allowed_pages: list[str] = []
+
+class AdminUserRead(BaseModel):
+    id: int
+    email: EmailStr
+    role: str
+    is_active: bool
+    allowed_pages: list[str] = []
+    model_config = {"from_attributes": True}
+
 class MemberCreate(BaseModel):
     first_name: str
     last_name: str
